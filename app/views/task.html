@@ -1,0 +1,121 @@
+<div class="row">
+    <div class="col-lg-10 col-lg-offset-1" >
+        <div class="row sortBy">
+            <button class="pull-left btn btn-default" ng-click="newTask.status = true"><i class="glyphicon glyphicon-plus"></i> Add new Task  </button>
+
+            <div class="btn-group pull-right">
+                <button type="button" class="btn btn-default">Sort By</button>
+                <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+                    <span class="caret"></span>
+                </button>
+                <ul class="dropdown-menu" role="menu">
+                    <li><a href="" ng-class="{active:predicate == 'priority'}" ng-click="predicate = 'priority'; reverse=!reverse" default>Priority</a ></li>
+                    <li> <a ng-class="{active:predicate == 'cDate'}" href="" ng-click="predicate = 'cDate'; reverse=!reverse">Date</a ></li>
+                    <li> <a ng-class="{active:predicate == 'status'}" href="" ng-click="predicate = 'status'; reverse=!reverse">Status</a ></li>
+                </ul>
+            </div>
+        </div>
+        <h4 class="heading text-center no-border">
+            <i class="glyphicon glyphicon-list-alt"></i> Task Manager
+        </h4>
+        <div class="row task-new" ng-show="newTask.status">
+            <div class="col-lg-8 col-lg-offset-2">
+                <form class="form-horizontal well" role="form" ng-submit="addTask(newTask)">
+                    <div class="form-group">
+                        <label for="inputTaskName" class="col-lg-2 control-label">Task</label>
+                        <div class="col-lg-10">
+                            <input required type="text" ng-model="newTask.name" class="form-control" id="inputTaskName" placeholder="Name of the task">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="inputAssginTo" class="col-lg-2 control-label">Assign to</label>
+                        <div class="col-lg-10">
+                            <select  ng-model="newTask.assignTo" required class="form-control" id="inputAssginTo">
+                                <option ng-repeat="user in TaskUsers" value="{{user.name}}">{{user.name}}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="inputPriority" class="col-lg-2 control-label">Priority</label>
+                        <div class="col-lg-10">
+                            <select required ng-model="newTask.priority"  class="form-control"  id="inputPriority">
+                                <option>1</option>
+                                <option>2</option>
+                                <option>3</option>
+                                <option>4</option>
+                                <option>5</option>
+                                <option>6</option>
+                                <option>7</option>
+                                <option>8</option>
+                                <option>9</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="inputDesc" class="col-lg-2 control-label">Description</label>
+                        <div class="col-lg-10">
+                            <textarea required class="form-control" rows="4" ng-model="newTask.desc"  id="inputDesc" placeholder="Description about the task"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="col-lg-offset-2 col-lg-10">
+                            <button type="submit" class="btn btn-success pull-right">Add</button>
+                            <button type="reset" class="btn btn-warning" ng-click="newTask.status = false">Cancel</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="row task-container">
+            
+            <div class="panel-group" id="accordion">
+                <div class="panel panel-default" ng-repeat="task in Tasks | orderBy:predicate:reverse">
+                    <div class="panel-heading" data-toggle="collapse" data-parent="#accordion" href="#task{{$index}}">
+                        <span class="slno label" ng-class="{
+                        'label-info':task.status == 'Open',
+                        'label-warning':task.status == 'Incomplete',
+                        'label-success':task.status == 'Complete'}">{{$index + 1 }} </span>
+                        <span class="pull-right priority">  {{task.priority}} </span>
+                        <span class="panel-title">
+                            {{task.title}} 
+                        </span>
+                        <span class="task-assginedTo pull-right"> {{task.assignedTo}}</span>
+                    </div>
+                    <div id="task{{$index}}" class="panel-collapse collapse">
+                        <div class="panel-body">
+                            <div class="pull-right task-misc">
+                                <span class="task-date">{{task.cDate | date:'dd/MM/yy hh:mm a'}}</span>
+                                <span class="label" ng-class="{
+                                'label-info':task.status == 'Open',
+                                'label-warning':task.status == 'Incomplete',
+                                'label-success':task.status == 'Complete'}">{{task.status}} </span>
+                            </div>
+                            <p>{{task.desc}}</p>
+                            <div class="row"></div>
+                            <h4 class="subHeading">Comments</h4>
+                            <p class="task-comments" ng-repeat="comment in task.comments">{{comment}}</p>
+                            <form class="form-inline comment-form" role="form" ng-submit="addComment(task)">
+                                <div class="form-group">
+                                    <textarea class="form-control" rows="2" ng-model="task.newComment"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-default">Add Comment</button>
+                            </form>
+
+
+                            <div class="row">
+                                <div class="col-lg-6" >
+                                    <img class="task-img" ng-show="task.photo" src="{{task.photo.url()}}" alt="Photo">
+                                </div>
+                                <div class="col-lg-6">
+                                    <img class="task-img pull-right" ng-show="task.signature" src="{{task.signature.url()}}" alt="Photo">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+

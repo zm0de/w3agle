@@ -1,0 +1,108 @@
+<!doctype html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8">
+<link rel="stylesheet" href="bower_components/font-awesome/css/font-awesome-ie7.min.css">
+<![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title>Weagle</title>
+  <meta name="viewport" content="width=device-width">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content=""/>
+  <meta name="keywords" content="Field Force Tracker, Wiinnova Software Labs "/>   
+  <meta name="author" content="Anenth Vishnu">
+  <link rel="stylesheet" href="bower_components/bootstrap/dist/css/bootstrap.min.css">
+  <!-- build:css({.tmp,app}) styles/main.css -->
+  <link rel="stylesheet" href="styles/main.css">
+  <link rel="stylesheet" href="styles/table.css">
+  <!-- endbuild -->
+  <!-- <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-theme.min.css"> -->
+  <link rel="shortcut icon" href="favicon.ico">
+</head>
+<body ng-app="WeagleApp">
+    <!--[if lt IE 7]>
+      <p class="chromeframe">You are using an outdated browser. <a href="http://browsehappy.com/">Upgrade your browser today</a> or <a href="http://www.google.com/chromeframe/?redirect=true">install Google Chrome Frame</a> to better experience this site.</p>
+      <![endif]-->
+
+    <!--[if lt IE 9]>
+      <script src="bower_components/es5-shim/es5-shim.js"></script>
+      <script src="bower_components/json3/lib/json3.min.js"></script>
+      <![endif]-->
+
+      <!-- Add your site or application content here -->
+
+      <nav class="navbar navbar-static-top navbar-default navbar-inverse" role="navigation">
+        <div class="container">
+          <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse" data-ng-show="Username" >
+              <span class="sr-only">Toggle navigation</span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="#/home">Weagle</a>
+          </div>
+          <div class="collapse navbar-collapse" >
+           <ul class="nav navbar-nav navbar-right" ng-cloak data-ng-show="Username">
+            <li ng-class="{active:navCurrent == '/home',hide:Role == 'User'}">
+              <a href="#/home">Home</a>
+            </li>
+            <li ng-class="{active:navCurrent == '/task',hide:Role == 'User'}">
+              <a href="#/task">Task Manager</a>
+            </li>
+            <li ng-class="{active:navCurrent == '/message',hide:Role == 'User'}">
+              <a href="#/message">Message</a>
+            </li>
+            <li ng-class="{active:navCurrent == '/checkins',hide:Role == 'User'}">
+              <a href="#/checkins">CheckIns</a>
+            </li>
+            <li class="dropdown">
+              <a href="#" class="dropdown-toggle " data-toggle="dropdown" > {{Username }} <b class="caret"></b></a>
+              <ul class="dropdown-menu">
+                <li><a href=""><i class="glyphicon glyphicon-cog"></i> Settings</a></li>
+                <li><a  href="#/logout"><i class="glyphicon glyphicon-log-out"></i> Logout</a></li>
+              </ul>
+            </li>
+          </ul>
+        </div><!-- /.navbar-collapse -->
+      </div>
+    </nav>
+    <div class="container">
+      <div class="row" data-ng-show="flash" ng-cloak>
+        <div class="alert-navbar alert alert-danger text-center">
+          <strong  >  {{ flash }} </strong> <br>
+          <button type="button" class="close" ng-click="flash=''">×</button>
+        </div>
+      </div>
+      <div  data-ng-view=""></div>
+    </div>
+
+    <!-- Google Analytics -->
+    <script>
+      var _gaq=[['_setAccount','UA-43291427-1'],['_trackPageview']];
+      (function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
+        g.src='//www.google-analytics.com/ga.js';
+        s.parentNode.insertBefore(g,s)}(document,'script'));
+    </script>
+    <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?libraries=places&sensor=true"></script>
+    <script src="bower_components/jquery/jquery.js"></script>
+    <script src="bower_components/angular/angular.js"></script>
+    <!-- build:js scripts/plugins.js -->
+    <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
+    <script src="bower_components/underscore/underscore-min.js"></script>
+    <script src="bower_components/parse-js-sdk/lib/parse.min.js"></script>
+    <script src="bower_components/typeahead.js/dist/typeahead.min.js"></script>
+    <script src='bower_components/typeahead.js/test/vendor/hogan-2.0.0.js'></script>
+    <script src='bower_components/datatables/media/js/jquery.dataTables.js'></script>
+    <script src="scripts/markerwithlabel.js"></script>
+    <script src="scripts/datesort.js"></script>
+    <!-- endbuild -->
+    
+    <!-- build:js({.tmp,app}) scripts/scripts.js -->
+    <script src="scripts/app.js"></script>
+    <!-- endbuild -->
+  </body>
+  </html>

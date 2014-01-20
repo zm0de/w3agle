@@ -1,0 +1,33 @@
+<div class="row">
+  <div class="col-lg-10 col-lg-offset-1 " >
+    <div  class="table-responsive well checkin-table-main">
+     <div id="loading_div" data-ng-hide="checkIns">
+      <div class="ajax-loader"></div>
+    </div>
+    <div data-ng-show="checkIns">
+      <a class="close close-relative" href="#/checkins" ng-click="reload()"> <i class="glyphicon glyphicon-refresh"></i></a>
+      <h4 class="heading text-center"><i class="glyphicon glyphicon-map-marker"></i> Check-ins   </h4>
+     <table class="table table-hover chechinDatatable">
+      <thead>
+        <tr>  
+          <th>Name</th>
+          <th>Location</th>
+          <th>Message</th>
+          <th>Date/Time</th>
+        </tr>
+      </thead>
+      <tbody >
+        <tr ng-repeat="checkin in checkIns">
+          <td> <img class="userPhoto" src="{{checkin.photo.url()}}" alt="">   <span class="deviceName">{{checkin.name}}</span> </td>
+          <td>{{checkin.location}}</td>
+          <td>{{checkin.message}}</td>
+          <td>{{checkin.time | date:'dd/MM/yy hh:mm a' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+</div>
+
+
