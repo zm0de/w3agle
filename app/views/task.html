@@ -31,7 +31,7 @@
                         <label for="inputAssginTo" class="col-lg-2 control-label">Assign to</label>
                         <div class="col-lg-10">
                             <select  ng-model="newTask.assignTo" required class="form-control" id="inputAssginTo">
-                                <option ng-repeat="user in TaskUsers" value="{{user.name}}">{{user.name}}</option>
+                                <option ng-repeat="user in TaskUsers" value="{{user.email}}">{{user.name}}</option>
                             </select>
                         </div>
                     </div>
@@ -67,7 +67,7 @@
             </div>
         </div>
         <div class="row task-container">
-            
+
             <div class="panel-group" id="accordion">
                 <div class="panel panel-default" ng-repeat="task in Tasks | orderBy:predicate:reverse">
                     <div class="panel-heading" data-toggle="collapse" data-parent="#accordion" href="#task{{$index}}">
@@ -77,7 +77,7 @@
                         'label-success':task.status == 'Complete'}">{{$index + 1 }} </span>
                         <span class="pull-right priority">  {{task.priority}} </span>
                         <span class="panel-title">
-                            {{task.title}} 
+                            {{task.title}}
                         </span>
                         <span class="task-assginedTo pull-right"> {{task.assignedTo}}</span>
                     </div>

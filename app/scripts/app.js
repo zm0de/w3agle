@@ -569,7 +569,8 @@ app.controller('TaskCtrl', ['$scope', '$route', function ($scope, $route) {
     success: function(results) {
       $scope.TaskUsers = results.map(function(obj) {
         return {
-          name: obj.get('name')
+          name: obj.get('name'),
+          email: obj.get('email')
         };
       });
       $scope.$apply();
