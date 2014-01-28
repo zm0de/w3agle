@@ -191,6 +191,7 @@ app.controller('GetLocation',['$scope', '$filter' , 'AuthenticationService', 'Fl
     google.maps.event.trigger(map, 'resize');
     var location = new Parse.Query('Checkin');
     location.equalTo('email', email);
+    location.descending('createdAt');
     location.find({
       success: function(results) {
         FlashService.clear();
@@ -541,7 +542,7 @@ app.controller('EmployeCheckInCtrl', ['$scope', function ($scope) {
 }]);
 app.controller('TaskCtrl', ['$scope', '$route', function ($scope, $route) {
   var tasks = new Parse.Query('Tasks');
-  tasks.ascending('priority');
+  tasks.descending('createdAt');
   tasks.limit(100);
   tasks.equalTo('assignedBy', $scope.Useremail);
   tasks.find({
@@ -582,7 +583,8 @@ app.controller('TaskCtrl', ['$scope', '$route', function ($scope, $route) {
         if(!task.comments){
           task.comments = [];
         }
-        task.comments.push(task.newComment);
+        task.comments.push($scope.Username + ": " + task.newComment);
+        //debugger;
         task.newComment ='';
         $scope.$apply();
         object.set('comments',task.comments);
