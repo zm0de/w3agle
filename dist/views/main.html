@@ -1,0 +1,62 @@
+<div class="row">
+    <div class="col-lg-3 col-md-3 col-sm-3 well well-nopadding">
+        <h5 class="nav-heading">Users</h5>
+        <ul class="nav nav-pills nav-stacked nav-devices" data-ng-cloak="">
+            <li data-ng-repeat="user in Users" class="device" ng-class="{active:user.id == selected}">
+              <a href="" ng-click="mapLocate(user.id,user.name)"> 
+                <img class="userPhoto" src="{{user.photo.url()}}" alt=""> 
+                <span class="deviceName">{{user.name}}</span> 
+                <div class="dropdown">
+                  <a data-toggle="dropdown" class="caret-icon" href="#"><i class="glyphicon glyphicon-chevron-down"></i></a>
+                  <ul class="dropdown-menu pull-right nav nav-pills nav-stacked" role="menu" aria-labelledby="dropdownMenu1">
+                    <li role="presentation"><a ng-click="checkIn(user.id)" role="menuitem" tabindex="-1" href=""><i class="glyphicon glyphicon-map-marker"></i> Check-ins</a></li>
+                    <li role="presentation"><a ng-click="tracks(user.id)" role="menuitem" tabindex="-1" href=""><i class="glyphicon glyphicon-road"></i> Tracks</a></li>
+                  </ul>
+                </div>
+              </a>
+            </li>
+            
+            <li class="disabled" data-ng-show="noDeviceFlag"><a href="" class="text-muted">No users </a></li>
+            
+            <li class="text-right" ng-class="{active:'showAll' == selected}"><a data-ng-click="showAll()" href=""> <i class="glyphicon glyphicon-search"></i>  Show All</a></li>
+        </ul>
+        <div id="loading_div" data-ng-hide="Users || noDeviceFlag">
+              <div class="ajax-loader"></div>
+        </div>
+    </div>
+    <div class="col-lg-9 col-md-9 col-sm-9" ng-switch="" on="mainSelection">
+   
+     
+      <div id="map_canvas" style="height: 500px; width: 100%"></div>
+    
+      <div ng-switch-when="loading" class="overlay">
+         <div id="loading_div">
+           <div class="ajax-loader"></div>
+        </div>
+      </div>
+
+      <div ng-switch-when="checkins" class="table-responsive checkin-table fade in">
+         <h4 class="heading"><i class="glyphicon glyphicon-map-marker"></i> Check-ins
+            <button type="button" class="close" ng-click="closeCheckins()" aria-hidden="true">&times;</button>
+        <a href="" class="checkinTableAdvance" ng-hide="advanceSearchFlag" ng-click="searchCheckin()" aria-hidden="true">(Advance Options)</a>
+          </h4>
+        
+        <table class="table table-hover chechinDatatable">
+          <thead>
+            <tr>
+              <th class="col-lg-4">Location</th>
+              <th>Message</th>
+              <th>Date/Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="checks in checkIns">
+              <td>{{checks.location}}</td>
+              <td>{{checks.message}}</td>
+              <td>{{checks.time | date:'dd/MM/yy hh:mm a' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+</div>

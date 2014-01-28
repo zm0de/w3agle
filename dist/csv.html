@@ -1,0 +1,28 @@
+<input type="file" name="csv" id="csv">
+	<input type="text" id="emails">
+
+<div class="container"></div>
+<script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+<script src="jquery.csv-0.71.min.js"></script>
+<script type="text/javascript">
+  function readSingleFile(evt) {
+  	var emails = '';
+    var file = evt.target.files[0]; 
+    if (file) {
+      var reader = new FileReader();
+      reader.onload = function(e) { 
+	      var contents = e.target.result;
+	      var data = $.csv.toArrays(contents);
+	      for(var i in data){
+	      	emails += data[i][1] + ", ";
+	      }
+	      $('#emails').val(emails);
+      }
+      reader.readAsText(file);
+    } else { 
+      alert("Failed to load file");
+    }
+  }
+
+  document.getElementById('csv').addEventListener('change', readSingleFile, false);
+</script>
