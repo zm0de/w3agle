@@ -1,10 +1,10 @@
 /*!
  * Parse JavaScript SDK
- * Version: 1.2.16
- * Built: Fri Jan 03 2014 11:30:19
+ * Version: 1.2.8
+ * Built: Mon Jun 03 2013 13:45:00
  * http://parse.com
  *
- * Copyright 2014 Parse, Inc.
+ * Copyright 2013 Parse, Inc.
  * The Parse JavaScript SDK is freely distributable under the MIT license.
  *
  * Includes: Underscore.js
@@ -13,7 +13,7 @@
  */
 (function(root) {
   root.Parse = root.Parse || {};
-  root.Parse.VERSION = "js1.2.16";
+  root.Parse.VERSION = "js1.2.8";
 }(this));
 //     Underscore.js 1.4.4
 //     http://underscorejs.org
@@ -1476,31 +1476,12 @@
       }
     };
     xdr.onerror = xdr.ontimeout = function() {
-      // Let's fake a real error message.
-      var fakeResponse = {
-        responseText: JSON.stringify({
-          code: Parse.Error.X_DOMAIN_REQUEST,
-          error: "IE's XDomainRequest does not supply error info."
-        })
-      };
-      promise.reject(fakeResponse);
+      promise.reject(xdr);
     };
     xdr.onprogress = function() {};
     xdr.open(method, url);
     xdr.send(data);
     return promise;
-  };
-
-  Parse._useXDomainRequest = function() {
-    if (typeof(XDomainRequest) !== "undefined") {
-      // We're in IE 8+.
-      if ('withCredentials' in new XMLHttpRequest()) {
-        // We're in IE 10+.
-        return false;
-      }
-      return true;
-    }
-    return false;
   };
 
   
@@ -1510,7 +1491,7 @@
       error: error
     };
 
-    if (Parse._useXDomainRequest()) {
+    if (typeof(XDomainRequest) !== "undefined") {
       return Parse._ajaxIE8(method, url, data)._thenRunCallbacks(options);
     }
 
@@ -1560,52 +1541,30 @@
   };
 
   /**
-   * Options:
-   *   route: is classes, users, login, etc.
-   *   objectId: null if there is no associated objectId.
-   *   method: the http method for the REST API.
-   *   dataObject: the payload as an object, or null if there is none.
-   *   useMasterKey: overrides whether to use the master key if set.
+   * route is classes, users, login, etc.
+   * objectId is null if there is no associated objectId.
+   * method is the http method for the REST API.
+   * dataObject is the payload as an object, or null if there is none.
    * @ignore
    */
-  Parse._request = function(options) {
-    var route = options.route;
-    var className = options.className;
-    var objectId = options.objectId;
-    var method = options.method;
-    var useMasterKey = options.useMasterKey;
-    var sessionToken = options.sessionToken;
-    var dataObject = options.data;
-
+  Parse._request = function(route, className, objectId, method, dataObject) {
     if (!Parse.applicationId) {
-      throw "You must specify your applicationId using Parse.initialize.";
+      throw "You must specify your applicationId using Parse.initialize";
     }
 
     if (!Parse.javaScriptKey && !Parse.masterKey) {
-      throw "You must specify a key using Parse.initialize.";
-    }
-
-    
-    if (!sessionToken) {
-      // Use the current user session token if none was provided.
-      var currentUser = Parse.User.current();
-      if (currentUser && currentUser._sessionToken) {
-        sessionToken = currentUser._sessionToken;
-      }
+      throw "You must specify a key using Parse.initialize";
     }
 
     
     if (route !== "batch" &&
         route !== "classes" &&
-        route !== "events" &&
         route !== "files" &&
         route !== "functions" &&
         route !== "login" &&
         route !== "push" &&
         route !== "requestPasswordReset" &&
-        route !== "rest_verify_analytics" &&
-        route !== "users" &&
-        route !== "jobs") {
+        route !== "users") {
       throw "Bad route: '" + route + "'.";
     }
 
@@ -1627,12 +1586,8 @@
       method = "POST";
     }
 
-    if (Parse._.isUndefined(useMasterKey)) {
-      useMasterKey = Parse._useMasterKey;
-    }
-
     dataObject._ApplicationId = Parse.applicationId;
-    if (!useMasterKey) {
+    if (!Parse._useMasterKey) {
       dataObject._JavaScriptKey = Parse.javaScriptKey;
     } else {
       dataObject._MasterKey = Parse.masterKey;
@@ -1640,8 +1595,10 @@
 
     dataObject._ClientVersion = Parse.VERSION;
     dataObject._InstallationId = Parse._getInstallationId();
-    if (sessionToken) {
-      dataObject._SessionToken = sessionToken;
+    // Pass the session token on every request.
+    var currentUser = Parse.User.current();
+    if (currentUser && currentUser._sessionToken) {
+      dataObject._SessionToken = currentUser._sessionToken;
     }
     var data = JSON.stringify(dataObject);
 
@@ -1652,19 +1609,14 @@
       if (response && response.responseText) {
         try {
           var errorJSON = JSON.parse(response.responseText);
-          error = new Parse.Error(errorJSON.code, errorJSON.error);
+          if (errorJSON) {
+            error = new Parse.Error(errorJSON.code, errorJSON.error);
+          }
         } catch (e) {
           // If we fail to parse the error text, that's okay.
-          error = new Parse.Error(
-              Parse.Error.INVALID_JSON,
-              "Received an error with invalid JSON from Parse: " +
-                  response.responseText);
         }
-      } else {
-        error = new Parse.Error(
-            Parse.Error.CONNECTION_FAILED,
-            "XMLHttpRequest failed: " + JSON.stringify(response));
       }
+      error = error || new Parse.Error(-1, response.responseText);
       // By explicitly returning a rejected Promise, this will work with
       // either jQuery or Promises/A semantics.
       return Parse.Promise.error(error);
@@ -1686,7 +1638,7 @@
    * if seenObjects is falsey. Otherwise any Parse.Objects not in
    * seenObjects will be fully embedded rather than encoded
    * as a pointer.  This array will be used to prevent going into an infinite
-   * loop because we have circular references.  If seenObjects
+   * loop because we have circular references.  If <seenObjects>
    * is set, then none of the Parse Objects that are serialized can be dirty.
    */
   Parse._encode = function(value, seenObjects, disallowObjects) {
@@ -1888,70 +1840,6 @@
   Parse._isNullOrUndefined = function(x) {
     return Parse._.isNull(x) || Parse._.isUndefined(x);
   };
-}(this));
-
-(function(root) {
-  root.Parse = root.Parse || {};
-  var Parse = root.Parse;
-  var _ = Parse._;
-
-  /**
-   * @namespace Provides an interface to Parse's logging and analytics backend.
-   */
-  Parse.Analytics = Parse.Analytics || {};
-
-  _.extend(Parse.Analytics, /** @lends Parse.Analytics */ {
-    /**
-     * Tracks the occurrence of a custom event with additional dimensions.
-     * Parse will store a data point at the time of invocation with the given
-     * event name.
-     *
-     * Dimensions will allow segmentation of the occurrences of this custom
-     * event. Keys and values should be {@code String}s, and will throw
-     * otherwise.
-     *
-     * To track a user signup along with additional metadata, consider the
-     * following:
-     * <pre>
-     * var dimensions = {
-     *  gender: 'm',
-     *  source: 'web',
-     *  dayType: 'weekend'
-     * };
-     * Parse.Analytics.track('signup', dimensions);
-     * </pre>
-     *
-     * There is a default limit of 4 dimensions per event tracked.
-     *
-     * @param {String} name The name of the custom event to report to Parse as
-     * having happened.
-     * @param {Object} dimensions The dictionary of information by which to
-     * segment this event.
-     * @return {Parse.Promise} A promise that is resolved when the round-trip
-     * to the server completes.
-     */
-    track: function(name, dimensions) {
-      name = name || '';
-      name = name.replace(/^\s*/, '');
-      name = name.replace(/\s*$/, '');
-      if (name.length === 0) {
-        throw 'A name for the custom event must be provided';
-      }
-
-      _.each(dimensions, function(val, key) {
-        if (!_.isString(key) || !_.isString(val)) {
-          throw 'track() dimensions expects keys and values of type "string".';
-        }
-      });
-
-      return Parse._request({
-        route: 'events',
-        className: name,
-        method: 'POST',
-        data: { dimensions: dimensions }
-      });
-    }
-  });
 }(this));
 
 (function(root) {
@@ -2287,30 +2175,7 @@
      * Twitter) is unsupported.
      * @constant
      */
-    UNSUPPORTED_SERVICE: 252,
-
-    /**
-     * Error code indicating that there were multiple errors. Aggregate errors
-     * have an "errors" property, which is an array of error objects with more
-     * detail about each error that occurred.
-     * @constant
-     */
-    AGGREGATE_ERROR: 600,
-
-    /**
-     * Error code indicating the client was unable to read an input file.
-     * @constant
-     */
-    FILE_READ_ERROR: 601,
-
-    /**
-     * Error code indicating a real error code is unavailable because
-     * we had to use an XDomainRequest object to allow CORS requests in
-     * Internet Explorer, which strips the body from HTTP responses that have
-     * a non-2XX status code.
-     * @constant
-     */
-    X_DOMAIN_REQUEST: 602
+    UNSUPPORTED_SERVICE: 252
   });
 
 }(this));
@@ -3551,7 +3416,7 @@
    * called when the async task is fulfilled.
    *
    * <p>Typical usage would be like:<pre>
-   *    query.find().then(function(results) {
+   *    query.findAsync().then(function(results) {
    *      results[0].set("foo", "bar");
    *      return results[0].saveAsync();
    *    }).then(function(result) {
@@ -3559,7 +3424,7 @@
    *    });
    * </pre></p>
    *
-   * @see Parse.Promise.prototype.then
+   * @see Parse.Promise.prototype.next
    * @class
    */
   Parse.Promise = function() {
@@ -3603,26 +3468,8 @@
      * Returns a new promise that is fulfilled when all of the input promises
      * are resolved. If any promise in the list fails, then the returned promise
      * will fail with the last error. If they all succeed, then the returned
-     * promise will succeed, with the results being the results of all the input
-     * promises. For example: <pre>
-     *   var p1 = Parse.Promise.as(1);
-     *   var p2 = Parse.Promise.as(2);
-     *   var p3 = Parse.Promise.as(3);
-     *
-     *   Parse.Promise.when(p1, p2, p3).then(function(r1, r2, r3) {
-     *     console.log(r1);  // prints 1
-     *     console.log(r2);  // prints 2
-     *     console.log(r3);  // prints 3
-     *   });</pre>
-     *
-     * The input promises can also be specified as an array: <pre>
-     *   var promises = [p1, p2, p3];
-     *   Parse.Promise.when(promises).then(function(r1, r2, r3) {
-     *     console.log(r1);  // prints 1
-     *     console.log(r2);  // prints 2
-     *     console.log(r3);  // prints 3
-     *   });
-     * </pre>
+     * promise will succeed, with the result being an array with the results of
+     * all the input promises.
      * @param {Array} promises a list of promises to wait for.
      * @return {Parse.Promise} the new promise.
      */
@@ -3802,28 +3649,6 @@
       }
 
       return promise;
-    },
-
-    /**
-     * Add handlers to be called when the promise 
-     * is either resolved or rejected
-     */
-    always: function(callback) {
-      return this.then(callback, callback);
-    },
-
-    /**
-     * Add handlers to be called when the Promise object is resolved
-     */
-    done: function(callback) {
-      return this.then(callback);
-    },
-
-    /**
-     * Add handlers to be called when the Promise object is rejected
-     */
-    fail: function(callback) {
-      return this.then(null, callback);
     },
 
     /**
@@ -4157,25 +3982,21 @@
 
     if (typeof(FileReader) === "undefined") {
       return Parse.Promise.error(new Parse.Error(
-          Parse.Error.FILE_READ_ERROR,
-          "Attempted to use a FileReader on an unsupported browser."));
+          -1, "Attempted to use a FileReader on an unsupported browser."));
     }
 
     var reader = new FileReader();
     reader.onloadend = function() {
       if (reader.readyState !== 2) {
-        promise.reject(new Parse.Error(
-            Parse.Error.FILE_READ_ERROR,
-            "Error reading file."));
+        promise.reject(new Parse.Error(-1, "Error reading file."));
         return;
       }
 
       var dataURL = reader.result;
       var matches = /^data:([^;]*);base64,(.*)$/.exec(dataURL);
       if (!matches) {
-        promise.reject(new Parse.Error(
-            Parse.ERROR.FILE_READ_ERROR,
-            "Unable to interpret data URL: " + dataURL));
+        promise.reject(
+            new Parse.Error(-1, "Unable to interpret data URL: " + dataURL));
         return;
       }
 
@@ -4188,11 +4009,8 @@
   /**
    * A Parse.File is a local representation of a file that is saved to the Parse
    * cloud.
-   * @class
-   * @param name {String} The file's name. This will be prefixed by a unique
-   *     value once the file has finished saving. The file name must begin with
-   *     an alphanumeric character, and consist of alphanumeric characters,
-   *     periods, spaces, underscores, or dashes.
+   * @param name {String} The file's name. This will change to a unique value
+   *     once the file has finished saving.
    * @param data {Array} The data for the file, as either:
    *     1. an Array of byte value Numbers, or
    *     2. an Object like { base64: "..." } with a base64-encoded String.
@@ -4227,20 +4045,7 @@
     if (_.isArray(data)) {
       this._source = Parse.Promise.as(encodeBase64(data), guessedType);
     } else if (data && data.base64) {
-      // if it contains data uri, extract based64 and the type out of it.
-      /*jslint maxlen: 1000*/
-      var dataUriRegexp = /^data:([a-zA-Z]*\/[a-zA-Z+.-]*);(charset=[a-zA-Z0-9\-\/\s]*,)?base64,(\S+)/;
-      /*jslint maxlen: 80*/
-
-      var matches = dataUriRegexp.exec(data.base64);
-      if (matches && matches.length > 0) {
-        // if data URI with charset, there will have 4 matches.
-        this._source = Parse.Promise.as(
-          (matches.length === 4 ? matches[3] : matches[2]), matches[1]
-        );
-      } else {
-        this._source = Parse.Promise.as(data.base64, guessedType);
-      }
+      this._source = Parse.Promise.as(data.base64, guessedType);
     } else if (typeof(File) !== "undefined" && data instanceof File) {
       this._source = readAsync(data, type);
     } else if (_.isString(data)) {
@@ -4274,8 +4079,6 @@
      * @return {Parse.Promise} Promise that is resolved when the save finishes.
      */
     save: function(options) {
-      options= options || {};
-
       var self = this;
       if (!self._previousSave) {
         self._previousSave = self._source.then(function(base64, type) {
@@ -4283,13 +4086,7 @@
             base64: base64,
             _ContentType: type
           };
-          return Parse._request({
-            route: "files",
-            className: self._name,
-            method: 'POST',
-            data: data,
-            useMasterKey: options.useMasterKey
-          });
+          return Parse._request("files", self._name, null, 'POST', data);
 
         }).then(function(response) {
           self._name = response.name;
@@ -4409,167 +4206,9 @@
    *
    * @param {Array} list A list of <code>Parse.Object</code>.
    * @param {Object} options A Backbone-style callback object.
-   * Valid options are:<ul>
-   *   <li>useMasterKey: In Cloud Code and Node only, causes the Master Key to
-   *     be used for this request.
-   * </ul>
    */
   Parse.Object.saveAll = function(list, options) {
-    options = options || {};
-    return Parse.Object._deepSaveAsync(list, {
-      useMasterKey: options.useMasterKey
-    })._thenRunCallbacks(options);
-  };
-
-  /**
-   * Destroy the given list of models on the server if it was already persisted.
-   * Optimistically removes each model from its collection, if it has one.
-   * If `wait: true` is passed, waits for the server to respond before removal.
-   *
-   * <p>Unlike saveAll, if an error occurs while deleting an individual model,
-   * this method will continue trying to delete the rest of the models if
-   * possible, except in the case of a fatal error like a connection error.
-   *
-   * <p>In particular, the Parse.Error object returned in the case of error may
-   * be one of two types:
-   *
-   * <ul>
-   *   <li>A Parse.Error.AGGREGATE_ERROR. This object's "errors" property is an
-   *       array of other Parse.Error objects. Each error object in this array
-   *       has an "object" property that references the object that could not be
-   *       deleted (for instance, because that object could not be found).</li>
-   *   <li>A non-aggregate Parse.Error. This indicates a serious error that 
-   *       caused the delete operation to be aborted partway through (for 
-   *       instance, a connection failure in the middle of the delete).</li>
-   * </ul>
-   *
-   * <p>There are two ways you can call this function.
-   * 
-   * The Backbone way:<pre>
-   *   Parse.Object.destroyAll([object1, object2, ...], {
-   *     success: function() {
-   *       // All the objects were deleted.
-   *     },
-   *     error: function(error) {
-   *       // An error occurred while deleting one or more of the objects.
-   *       // If this is an aggregate error, then we can inspect each error
-   *       // object individually to determine the reason why a particular
-   *       // object was not deleted.
-   *       if (error.code == Parse.Error.AGGREGATE_ERROR) {
-   *         for (var i = 0; i < error.errors.length; i++) {
-   *           console.log("Couldn't delete " + error.errors[i].object.id + 
-   *             "due to " + error.errors[i].message);
-   *         }
-   *       } else {
-   *         console.log("Delete aborted because of " + error.message);
-   *       }
-   *     },
-   *   });
-   * </pre>
-   * A simplified syntax:<pre>
-   *   Parse.Object.destroyAll([obj1, obj2, ...], function(success, error) {
-   *     if (success) {
-   *       // All the objects were saved.
-   *     } else {
-   *       // An error occurred while deleting one or more of the objects.
-   *       // If this is an aggregate error, then we can inspect each error
-   *       // object individually to determine the reason why a particular
-   *       // object was not deleted.
-   *       if (error.code == Parse.Error.AGGREGATE_ERROR) {
-   *         for (var i = 0; i < error.errors.length; i++) {
-   *           console.log("Couldn't delete " + error.errors[i].object.id + 
-   *             "due to " + error.errors[i].message);
-   *         }
-   *       } else {
-   *         console.log("Delete aborted because of " + error.message);
-   *       }
-   *     }
-   *   });
-   * </pre>
-   *
-   * @param {Array} list A list of <code>Parse.Object</code>.
-   * @param {Object} options A Backbone-style callback object.
-   * Valid options are:<ul>
-   *   <li>useMasterKey: In Cloud Code and Node only, causes the Master Key to
-   *     be used for this request.
-   * </ul>
-   */
-  Parse.Object.destroyAll = function(list, options) {
-    options = options || {};
-
-    var triggerDestroy = function(object) {
-      object.trigger('destroy', object, object.collection, options);
-    };
-
-    var errors = [];
-    var destroyBatch = function(batch) {
-      var promise = Parse.Promise.as();
-
-      if (batch.length > 0) {
-        promise = promise.then(function() {
-          return Parse._request({
-            route: "batch",
-            method: "POST",
-            useMasterKey: options.useMasterKey,
-            data: {
-              requests: _.map(batch, function(object) {
-                return {
-                  method: "DELETE",
-                  path: "/1/classes/" + object.className + "/" + object.id
-                };
-              })
-            }
-          });
-        }).then(function(responses, status, xhr) {
-          Parse._arrayEach(batch, function(object, i) {
-            if (responses[i].success && options.wait) {
-              triggerDestroy(object);
-            } else if (responses[i].error) {
-              var error = new Parse.Error(responses[i].error.code,
-                                          responses[i].error.error);
-              error.object = object;
-
-              errors.push(error);
-            }
-          });
-        });
-      }
-
-      return promise;
-    };
-
-    var promise = Parse.Promise.as();
-    var batch = [];
-    Parse._arrayEach(list, function(object, i) {
-      if (!object.id || !options.wait) {
-        triggerDestroy(object);
-      }
-
-      if (object.id) {
-        batch.push(object);
-      }
-
-      if (batch.length === 20 || i+1 === list.length) {
-        var thisBatch = batch;
-        batch = [];
-
-        promise = promise.then(function() {
-          return destroyBatch(thisBatch);
-        });
-      }
-    });
-
-    return promise.then(function() {
-      if (errors.length === 0) {
-        return true;
-      } else {
-        var error = new Parse.Error(Parse.Error.AGGREGATE_ERROR,
-                                    "Error deleting an object in destroyAll");
-        error.errors = errors;
-
-        return Parse.Promise.error(error);
-      }
-    })._thenRunCallbacks(options);
+    return Parse.Object._deepSaveAsync(list)._thenRunCallbacks(options);
   };
 
   // Attach all inheritable methods to the Parse.Object prototype.
@@ -4670,14 +4309,6 @@
         return true;
       }
       return false;
-    },
-
-    /**
-     * Returns an array of keys that have been modified since last save/refresh
-     * @return {Array of string}
-     */
-    dirtyKeys: function() {
-      return _.keys(_.last(this._opSetQueue));
     },
 
     /**
@@ -4851,18 +4482,15 @@
      * the given object.
      */
     _finishFetch: function(serverData, hasData) {
-      
       // Clear out any changes the user might have made previously.
       this._opSetQueue = [{}];
 
       // Bring in all the new server data.
       this._mergeMagicFields(serverData);
       var self = this;
-      var tempServerData = {};
       Parse._objectEach(serverData, function(value, key) {
-        tempServerData[key] = Parse._decode(key, value);
+        self._serverData[key] = Parse._decode(key, value);
       });
-      self._serverData = tempServerData;
 
       // Refresh the attributes.
       this._rebuildAllEstimatedData();
@@ -5203,27 +4831,12 @@
      * Fetch the model from the server. If the server's representation of the
      * model differs from its current attributes, they will be overriden,
      * triggering a <code>"change"</code> event.
-     *
-     * @param {Object} options A Backbone-style callback object.
-     * Valid options are:<ul>
-     *   <li>success: A Backbone-style success callback.
-     *   <li>error: An Backbone-style error callback.
-     *   <li>useMasterKey: In Cloud Code and Node only, causes the Master Key to
-     *     be used for this request.
-     * </ul>
      * @return {Parse.Promise} A promise that is fulfilled when the fetch
      *     completes.
      */
     fetch: function(options) {
       var self = this;
-      options = options || {};
-      var request = Parse._request({
-        method: 'GET',
-        route: "classes",
-        className: this.className,
-        objectId: this.id,
-        useMasterKey: options.useMasterKey
-      });
+      var request = Parse._request("classes", this.className, this.id, 'GET');
       return request.then(function(response, status, xhr) {
         self._finishFetch(self.parse(response, status, xhr), true);
         return self;
@@ -5264,16 +4877,6 @@
      *     // The save failed.  Error is an instance of Parse.Error.
      *   });</pre>
      * 
-     * @param {Object} options A Backbone-style callback object.
-     * Valid options are:<ul>
-     *   <li>wait: Set to true to wait for the server to confirm a successful
-     *   save before modifying the attributes on the object.
-     *   <li>silent: Set to true to avoid firing the `set` event.
-     *   <li>success: A Backbone-style success callback.
-     *   <li>error: An Backbone-style error callback.
-     *   <li>useMasterKey: In Cloud Code and Node only, causes the Master Key to
-     *     be used for this request.
-     * </ul>
      * @return {Parse.Promise} A promise that is fulfilled when the save
      *     completes.
      * @see Parse.Error
@@ -5340,9 +4943,7 @@
                                         unsavedChildren,
                                         unsavedFiles);
       if (unsavedChildren.length + unsavedFiles.length > 0) {
-        return Parse.Object._deepSaveAsync(this.attributes, {
-          useMasterKey: options.useMasterKey
-        }).then(function() {
+        return Parse.Object._deepSaveAsync(this.attributes).then(function() {
           return model.save(null, options);
         }, function(error) {
           return Parse.Promise.error(error)._thenRunCallbacks(options, model);
@@ -5365,14 +4966,7 @@
           route = "users";
           className = null;
         }
-        var request = Parse._request({
-          route: route,
-          className: className,
-          objectId: model.id,
-          method: method,
-          useMasterKey: options.useMasterKey,
-          data: json
-        });
+        var request = Parse._request(route, className, model.id, method, json);
 
         request = request.then(function(resp, status, xhr) {
           var serverAttrs = model.parse(resp, status, xhr);
@@ -5402,15 +4996,6 @@
      * If `wait: true` is passed, waits for the server to respond
      * before removal.
      *
-     * @param {Object} options A Backbone-style callback object.
-     * Valid options are:<ul>
-     *   <li>wait: Set to true to wait for the server to confirm successful
-     *   deletion of the object before triggering the `destroy` event.
-     *   <li>success: A Backbone-style success callback
-     *   <li>error: An Backbone-style error callback.
-     *   <li>useMasterKey: In Cloud Code and Node only, causes the Master Key to
-     *     be used for this request.
-     * </ul>
      * @return {Parse.Promise} A promise that is fulfilled when the destroy
      *     completes.
      */
@@ -5430,13 +5015,8 @@
         triggerDestroy();
       }
 
-      var request = Parse._request({
-        route: "classes",
-        className: this.className,
-        objectId: this.id,
-        method: 'DELETE',
-        useMasterKey: options.useMasterKey
-      });
+      var request =
+          Parse._request("classes", this.className, this.id, 'DELETE');
       return request.then(function() {
         if (options.wait) {
           triggerDestroy();
@@ -5618,15 +5198,6 @@
         return new Parse.Error(Parse.Error.OTHER_CAUSE,
                                "ACL must be a Parse.ACL.");
       }
-      var correct = true;
-      Parse._objectEach(attrs, function(unused_value, key) {
-        if (!(/^[A-Za-z][0-9A-Za-z_]*$/).test(key)) {
-          correct = false;
-        }
-      });
-      if (!correct) {
-        return new Parse.Error(Parse.Error.INVALID_KEY_NAME); 
-      }
       return false;
     },
 
@@ -5715,22 +5286,14 @@
    *
    * <p>You should call either:<pre>
    *     var MyClass = Parse.Object.extend("MyClass", {
-   *         <i>Instance methods</i>,
-   *         initialize: function(attrs, options) {
-   *             this.someInstanceProperty = [],
-   *             <i>Other instance properties</i>
-   *         }
+   *         <i>Instance properties</i>
    *     }, {
    *         <i>Class properties</i>
    *     });</pre>
    * or, for Backbone compatibility:<pre>
    *     var MyClass = Parse.Object.extend({
    *         className: "MyClass",
-   *         <i>Instance methods</i>,
-   *         initialize: function(attrs, options) {
-   *             this.someInstanceProperty = [],
-   *             <i>Other instance properties</i>
-   *         }
+   *         <i>Other instance properties</i>
    *     }, {
    *         <i>Class properties</i>
    *     });</pre></p>
@@ -5754,11 +5317,9 @@
     }
 
     // If someone tries to subclass "User", coerce it to the right type.
-    if (className === "User" && Parse.User._performUserRewrite) {
+    if (className === "User") {
       className = "_User";
     }
-    protoProps = protoProps || {};
-    protoProps.className = className;
 
     var NewClassObject = null;
     if (_.has(Parse.Object._classMap, className)) {
@@ -5768,6 +5329,8 @@
       // For now, let's just pick one.
       NewClassObject = OldClassObject._extend(protoProps, classProps);
     } else {
+      protoProps = protoProps || {};
+      protoProps.className = className;
       NewClassObject = this._extend(protoProps, classProps);
     }
     // Extending a subclass should reuse the classname automatically.
@@ -5802,23 +5365,18 @@
   };
 
   Parse.Object._canBeSerializedAsValue = function(object) {
-    
-    if (object instanceof Parse.Object) {
-      return !!object.id;
-    }
-    if (object instanceof Parse.File) {
-      // Don't recurse indefinitely into files.
-      return true;
-    }
-
     var canBeSerializedAsValue = true;
 
-    if (_.isArray(object)) {
+    if (object instanceof Parse.Object) {
+      canBeSerializedAsValue = !!object.id;
+
+    } else if (_.isArray(object)) {
       Parse._arrayEach(object, function(child) {
         if (!Parse.Object._canBeSerializedAsValue(child)) {
           canBeSerializedAsValue = false;
         }
       });
+
     } else if (_.isObject(object)) {
       Parse._objectEach(object, function(child) {
         if (!Parse.Object._canBeSerializedAsValue(child)) {
@@ -5826,14 +5384,11 @@
         }
       });
     }
+
     return canBeSerializedAsValue;
   };
 
-  /**
-   * @param {Object} object The root object.
-   * @param {Object} options: The only valid option is useMasterKey.
-   */
-  Parse.Object._deepSaveAsync = function(object, options) {
+  Parse.Object._deepSaveAsync = function(object) {
     var unsavedChildren = [];
     var unsavedFiles = [];
     Parse.Object._findUnsavedChildren(object, unsavedChildren, unsavedFiles);
@@ -5841,7 +5396,7 @@
     var promise = Parse.Promise.as();
     _.each(unsavedFiles, function(file) {
       promise = promise.then(function() {
-        return file.save(options);
+        return file.save();
       });
     });
 
@@ -5889,30 +5444,26 @@
 
         // Save a single batch, whether previous saves succeeded or failed.
         return readyToStart._continueWith(function() {
-          return Parse._request({
-            route: "batch",
-            method: "POST",
-            useMasterKey: options.useMasterKey,
-            data: {
-              requests: _.map(batch, function(object) {
-                var json = object._getSaveJSON();
-                var method = "POST";
-  
-                var path = "/1/classes/" + object.className;
-                if (object.id) {
-                  path = path + "/" + object.id;
-                  method = "PUT";
-                }
-  
-                object._startSave();
-  
-                return {
-                  method: method,
-                  path: path,
-                  body: json
-                };
-              })
-            }
+          return Parse._request("batch", null, null, "POST", {
+            requests: _.map(batch, function(object) {
+              var json = object._getSaveJSON();
+              var method = "POST";
+
+              var path = "/1/classes/" + object.className;
+              if (object.id) {
+                path = path + "/" + object.id;
+                method = "PUT";
+              }
+
+              object._startSave();
+
+              return {
+                method: method,
+                path: path,
+                body: json
+              };
+            })
+
           }).then(function(response, status, xhr) {
             var error;
             Parse._arrayEach(batch, function(object, i) {
@@ -6146,15 +5697,6 @@
     /**
      * Add a model, or list of models to the set. Pass **silent** to avoid
      * firing the `add` event for every new model.
-     *
-     * @param {Array} models An array of instances of <code>Parse.Object</code>.
-     *
-     * @param {Object} options An optional object with Backbone-style options.
-     * Valid options are:<ul>
-     *   <li>at: The index at which to add the models.
-     *   <li>silent: Set to true to avoid firing the `add` event for every new
-     *   model.
-     * </ul>
      */
     add: function(models, options) {
       var i, index, length, model, cid, id, cids = {}, ids = {};
@@ -6218,13 +5760,6 @@
     /**
      * Remove a model, or a list of models from the set. Pass silent to avoid
      * firing the <code>remove</code> event for every model removed.
-     *
-     * @param {Array} models The model or list of models to remove from the
-     *   collection.
-     * @param {Object} options An optional object with Backbone-style options.
-     * Valid options are: <ul>
-     *   <li>silent: Set to true to avoid firing the `remove` event.
-     * </ul>
      */
     remove: function(models, options) {
       var i, l, index, model;
@@ -6251,8 +5786,6 @@
 
     /**
      * Gets a model from the set by id.
-     * @param {String} id The Parse objectId identifying the Parse.Object to
-     * fetch from this collection.
      */
     get: function(id) {
       return id && this._byId[id.id || id];
@@ -6260,8 +5793,6 @@
 
     /**
      * Gets a model from the set by client id.
-     * @param {} cid The Backbone collection id identifying the Parse.Object to
-     * fetch from this collection.
      */
     getByCid: function(cid) {
       return cid && this._byCid[cid.cid || cid];
@@ -6269,8 +5800,6 @@
 
     /**
      * Gets the model at the given index.
-     *
-     * @param {Number} index The index of the model to return.
      */
     at: function(index) {
       return this.models[index];
@@ -6280,10 +5809,6 @@
      * Forces the collection to re-sort itself. You don't need to call this
      * under normal circumstances, as the set will maintain sort order as each
      * item is added.
-     * @param {Object} options An optional object with Backbone-style options.
-     * Valid options are: <ul>
-     *   <li>silent: Set to true to avoid firing the `reset` event.
-     * </ul>
      */
     sort: function(options) {
       options = options || {};
@@ -6304,8 +5829,6 @@
 
     /**
      * Plucks an attribute from each model in the collection.
-     * @param {String} attr The attribute to return from each model in the
-     * collection.
      */
     pluck: function(attr) {
       return _.map(this.models, function(model){ return model.get(attr); });
@@ -6315,13 +5838,6 @@
      * When you have more items than you want to add or remove individually,
      * you can reset the entire set with a new list of models, without firing
      * any `add` or `remove` events. Fires `reset` when finished.
-     *
-     * @param {Array} models The model or list of models to remove from the
-     *   collection.
-     * @param {Object} options An optional object with Backbone-style options.
-     * Valid options are: <ul>
-     *   <li>silent: Set to true to avoid firing the `reset` event.
-     * </ul>
      */
     reset: function(models, options) {
       var self = this;
@@ -6342,16 +5858,6 @@
      * Fetches the default set of models for this collection, resetting the
      * collection when they arrive. If `add: true` is passed, appends the
      * models to the collection instead of resetting.
-     *
-     * @param {Object} options An optional object with Backbone-style options.
-     * Valid options are:<ul>
-     *   <li>silent: Set to true to avoid firing `add` or `reset` events for
-     *   models fetched by this fetch.
-     *   <li>success: A Backbone-style success callback.
-     *   <li>error: An Backbone-style error callback.
-     *   <li>useMasterKey: In Cloud Code and Node only, uses the Master Key for
-     *       this request.
-     * </ul>
      */
     fetch: function(options) {
       options = _.clone(options) || {};
@@ -6360,9 +5866,7 @@
       }
       var collection = this;
       var query = this.query || new Parse.Query(this.model);
-      return query.find({
-        useMasterKey: options.useMasterKey
-      }).then(function(results) {
+      return query.find().then(function(results) {
         if (options.add) {
           collection.add(results, options);
         } else {
@@ -6376,19 +5880,6 @@
      * Creates a new instance of a model in this collection. Add the model to
      * the collection immediately, unless `wait: true` is passed, in which case
      * we wait for the server to agree.
-     *
-     * @param {Parse.Object} model The new model to create and add to the
-     *   collection.
-     * @param {Object} options An optional object with Backbone-style options.
-     * Valid options are:<ul>
-     *   <li>wait: Set to true to wait for the server to confirm creation of the
-     *       model before adding it to the collection.
-     *   <li>silent: Set to true to avoid firing an `add` event.
-     *   <li>success: A Backbone-style success callback.
-     *   <li>error: An Backbone-style error callback.
-     *   <li>useMasterKey: In Cloud Code and Node only, uses the Master Key for
-     *       this request.
-     * </ul>
      */
     create: function(model, options) {
       var coll = this;
@@ -7037,13 +6528,7 @@
      */
     logIn: function(options) {
       var model = this;
-      options = options || {};
-      var request = Parse._request({
-        route: "login",
-        method: "GET",
-        useMasterKey: options.useMasterKey,
-        data: this.toJSON()
-      });
+      var request = Parse._request("login", null, null, "GET", this.toJSON());
       return request.then(function(resp, status, xhr) {
         var serverAttrs = model.parse(resp, status, xhr);
         model._finishFetch(serverAttrs);
@@ -7157,16 +6642,6 @@
     authenticated: function() {
       return !!this._sessionToken &&
           (Parse.User.current() && Parse.User.current().id === this.id);
-    },
-
-    /**
-     * Returns the session token for this user, if the user has been logged in,
-     * or if it is the result of a query with the master key. Otherwise, returns
-     * undefined.
-     * @return {String} the session token, or undefined
-     */
-    getSessionToken: function() {
-      return this._sessionToken;
     }
 
   }, /** @lends Parse.User */ {
@@ -7185,9 +6660,6 @@
 
     // The mapping of auth provider names to actual providers
     _authProviders: {},
-
-    // Whether to rewrite className User to _User
-    _performUserRewrite: true,
 
 
     // Class Methods
@@ -7237,37 +6709,6 @@
     },
 
     /**
-     * Logs in a user with a session token. On success, this saves the session
-     * to disk, so you can retrieve the currently logged in user using
-     * <code>current</code>.
-     *
-     * <p>Calls options.success or options.error on completion.</p>
-     *
-     * @param {String} sessionToken The sessionToken to log in with.
-     * @param {Object} options A Backbone-style options object.
-     * @return {Parse.Promise} A promise that is fulfilled with the user when
-     *     the login completes.
-     */
-    become: function(sessionToken, options) {
-      options = options || {};
-
-      var user = Parse.Object._create("_User");
-      return Parse._request({
-        route: "users",
-        className: "me",
-        method: "GET",
-        useMasterKey: options.useMasterKey,
-        sessionToken: sessionToken
-      }).then(function(resp, status, xhr) {
-        var serverAttrs = user.parse(resp, status, xhr);
-        user._finishFetch(serverAttrs);
-        user._handleSaveResult(true);
-        return user;
-
-      })._thenRunCallbacks(options, user);
-    },
-
-    /**
      * Logs out the currently logged in user session. This will remove the
      * session from disk, log out of linked services, and future calls to
      * <code>current</code> will return <code>null</code>.
@@ -7295,13 +6736,9 @@
      * @param {Object} options A Backbone-style options object.
      */
     requestPasswordReset: function(email, options) {
-      options = options || {};
-      var request = Parse._request({
-        route: "requestPasswordReset",
-        method: "POST",
-        useMasterKey: options.useMasterKey,
-        data: { email: email }
-      });
+      var json = { email: email };
+      var request = Parse._request("requestPasswordReset", null, null, "POST",
+                                   json);
       return request._thenRunCallbacks(options);
     },
 
@@ -7343,18 +6780,6 @@
       Parse.User._currentUser._refreshCache();
       Parse.User._currentUser._opSetQueue = [{}];
       return Parse.User._currentUser;
-    },
-
-    /**
-     * Allow someone to define a custom User class without className
-     * being rewritten to _User. The default behavior is to rewrite
-     * User to _User for legacy reasons. This allows developers to
-     * override that behavior.
-     *
-     * @param {Boolean} isAllowed Whether or not to allow custom User class
-     */
-    allowCustomUserClass: function(isAllowed) {
-      this._performUserRewrite = !isAllowed;
     },
 
     /**
@@ -7504,12 +6929,8 @@
      * the server.  Either options.success or options.error is called when the
      * find completes.
      *
-     * @param {String} objectId The id of the object to be fetched.
+     * @param {} objectId The id of the object to be fetched.
      * @param {Object} options A Backbone-style options object.
-     * Valid options are:<ul>
-     *   <li>success: A Backbone-style success callback
-     *   <li>error: An Backbone-style error callback.
-     * </ul>
      */
     get: function(objectId, options) {
       var self = this;
@@ -7529,7 +6950,7 @@
 
     /**
      * Returns a JSON representation of this query.
-     * @return {Object} The JSON representation of the query.
+     * @return {Object}
      */
     toJSON: function() {
       var params = {
@@ -7564,28 +6985,15 @@
      * Either options.success or options.error is called when the find
      * completes.
      *
-     * @param {Object} options A Backbone-style options object. Valid options
-     * are:<ul>
-     *   <li>success: Function to call when the find completes successfully.
-     *   <li>error: Function to call when the find fails.
-     *   <li>useMasterKey: In Cloud Code and Node only, causes the Master Key to
-     *     be used for this request.
-     * </ul>
-     *
+     * @param {Object} options A Backbone-style options object.
      * @return {Parse.Promise} A promise that is resolved with the results when
      * the query completes.
      */
     find: function(options) {
       var self = this;
-      options = options || {};
 
-      var request = Parse._request({
-        route: "classes",
-        className: this.className,
-        method: "GET",
-        useMasterKey: options.useMasterKey,
-        data: this.toJSON()
-      });
+      var request = Parse._request("classes", this.className, null, "GET",
+                                   this.toJSON());
 
       return request.then(function(response) {
         return _.map(response.results, function(json) {
@@ -7606,31 +7014,16 @@
      * Either options.success or options.error is called when the count
      * completes.
      *
-     * @param {Object} options A Backbone-style options object. Valid options
-     * are:<ul>
-     *   <li>success: Function to call when the count completes successfully.
-     *   <li>error: Function to call when the find fails.
-     *   <li>useMasterKey: In Cloud Code and Node only, causes the Master Key to
-     *     be used for this request.
-     * </ul>
-     *
+     * @param {Object} options A Backbone-style options object.
      * @return {Parse.Promise} A promise that is resolved with the count when
      * the query completes.
      */
     count: function(options) {
-      var self = this;
-      options = options || {};
-
       var params = this.toJSON();
       params.limit = 0;
       params.count = 1;
-      var request = Parse._request({
-        route: "classes",
-        className: self.className, 
-        method: "GET",
-        useMasterKey: options.useMasterKey,
-        data: params
-      });
+      var request = Parse._request("classes", this.className, null, "GET",
+                                   params);
 
       return request.then(function(response) {
         return response.count;
@@ -7643,30 +7036,17 @@
      * Either options.success or options.error is called when it completes.
      * success is passed the object if there is one. otherwise, undefined.
      *
-     * @param {Object} options A Backbone-style options object. Valid options
-     * are:<ul>
-     *   <li>success: Function to call when the find completes successfully.
-     *   <li>error: Function to call when the find fails.
-     *   <li>useMasterKey: In Cloud Code and Node only, causes the Master Key to
-     *     be used for this request.
-     * </ul>
-     *
+     * @param {Object} options A Backbone-style options object.
      * @return {Parse.Promise} A promise that is resolved with the object when
      * the query completes.
      */
     first: function(options) {
       var self = this;
-      options = options || {};
 
       var params = this.toJSON();
       params.limit = 1;
-      var request = Parse._request({
-        route: "classes",
-        className: this.className, 
-        method: "GET",
-        useMasterKey: options.useMasterKey,
-        data: params
-      });
+      var request = Parse._request("classes", this.className, null, "GET",
+                                   params);
 
       return request.then(function(response) {
         return _.map(response.results, function(json) {
@@ -7679,14 +7059,6 @@
 
     /**
      * Returns a new instance of Parse.Collection backed by this query.
-     * @param {Array} items An array of instances of <code>Parse.Object</code>
-     *     with which to start this Collection.
-     * @param {Object} options An optional object with Backbone-style options.
-     * Valid options are:<ul>
-     *   <li>model: The Parse.Object subclass that this collection contains.
-     *   <li>query: An instance of Parse.Query to use when fetching items.
-     *   <li>comparator: A string property name or function to sort by.
-     * </ul>
      * @return {Parse.Collection}
      */
     collection: function(items, options) {
@@ -7728,10 +7100,6 @@
      * @return {Parse.Query} Returns the query, so you can chain this call.
      */
     equalTo: function(key, value) {
-      if (_.isUndefined(value)) {
-        return this.doesNotExist(key);
-      } 
-
       this._where[key] = Parse._encode(value);
       return this;
     },
@@ -8058,8 +7426,7 @@
      * values near the point given and within the maximum distance given.
      * @param {String} key The key that the Parse.GeoPoint is stored in.
      * @param {Parse.GeoPoint} point The reference Parse.GeoPoint that is used.
-     * @param {Number} maxDistance Maximum distance (in radians) of results to
-     *   return.
+     * @param maxDistance Maximum distance (in radians) of results to return.
      * @return {Parse.Query} Returns the query, so you can chain this call.
      */
     withinRadians: function(key, point, distance) {
@@ -8163,9 +7530,9 @@
      * promise, then iteration will stop with that error. The items are
      * processed in an unspecified order. The query may not have any sort order,
      * and may not use limit or skip.
-     * @param {Function} callback Callback that will be called with each result
+     * @param callback {Function} Callback that will be called with each result
      *     of the query.
-     * @param {Object} options An optional Backbone-like options object with
+     * @param options {Object} An optional Backbone-like options object with
      *     success and error callbacks that will be invoked once the iteration
      *     has finished.
      * @return {Parse.Promise} A promise that will be fulfilled once the
@@ -8264,17 +7631,6 @@
 
         // Suppress checks for login status from the browser.
         newOptions.status = false;
-
-        // If the user doesn't match the one known by the FB SDK, log out.
-        // Most of the time, the users will match -- it's only in cases where
-        // the FB SDK knows of a different user than the one being restored
-        // from a Parse User that logged in with username/password.
-        var existingResponse = FB.getAuthResponse();
-        if (existingResponse &&
-            existingResponse.userID !== authResponse.userID) {
-          FB.logout();
-        }
-
         FB.init(newOptions);
       }
       return true;
@@ -8284,6 +7640,7 @@
     },
     deauthenticate: function() {
       this.restoreAuthentication(null);
+      FB.logout();
     }
   };
 
@@ -8825,15 +8182,8 @@
      * of the function.
      */
     run: function(name, data, options) {
-      options = options || {};
-
-      var request = Parse._request({
-        route: "functions",
-        className: name,
-        method: 'POST',
-        useMasterKey: options.useMasterKey,
-        data: Parse._encode(data, null, true)
-      });
+      var request = Parse._request("functions", name, null, 'POST',
+                                   Parse._encode(data, null, true));
 
       return request.then(function(resp) {
         return Parse._decode(null, resp).result;
@@ -8875,8 +8225,6 @@
    * failed.
    */
   Parse.Push.send = function(data, options) {
-    options = options || {};
-
     if (data.where) {
       data.where = data.where.toJSON().where;
     }
@@ -8893,12 +8241,7 @@
       throw "Both expiration_time and expiration_time_interval can't be set";
     }
 
-    var request = Parse._request({
-      route: 'push',
-      method: 'POST',
-      data: data,
-      useMasterKey: options.useMasterKey
-    });
+    var request = Parse._request('push', null, null, 'POST', data);
     return request._thenRunCallbacks(options);
   };
 }(this));

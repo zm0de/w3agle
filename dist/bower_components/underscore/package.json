@@ -6,18 +6,12 @@
   "author"        : "Jeremy Ashkenas <jeremy@documentcloud.org>",
   "repository"    : {"type": "git", "url": "git://github.com/jashkenas/underscore.git"},
   "main"          : "underscore.js",
-  "version"       : "1.5.2",
+  "version"       : "1.5.1",
   "devDependencies": {
     "phantomjs": "1.9.0-1"
   },
   "scripts": {
     "test": "phantomjs test/vendor/runner.js test/index.html?noglobals=true"
   },
-  "licenses": [
-    {
-      "type": "MIT",
-      "url": "https://raw.github.com/jashkenas/underscore/master/LICENSE"
-    }
-  ],
-  "files"         : ["underscore.js", "underscore-min.js", "LICENSE"]
+  "license"       : "MIT"
 }
